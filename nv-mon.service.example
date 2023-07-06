@@ -3,7 +3,7 @@ Description=nvidia gpu monitoring
 
 [Service]
 Environment=INFLUXDB_USERNAME=changeme INFLUXDB_PASSWORD=changeme
-ExecStart=/home/jhjaggars/code/nv-mon-rl/target/release/nv-mon-rl
+ExecStart=/path/to/nv-mon-rl/target/release/nv-mon-rl
 Restart=always
 
 [Install]
