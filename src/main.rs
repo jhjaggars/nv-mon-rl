@@ -1,79 +1,59 @@
 use gethostname::gethostname;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::{thread, time};
+use influxdb::InfluxDbWriteable;
+use influxdb::{Client, Timestamp};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::time::{self, Duration};
 
 use nvml_wrapper::{
     enum_wrappers::device::{Clock, TemperatureSensor},
     Nvml,
 };
 
-#[derive(Serialize, Deserialize)]
-struct Point {
-    measurement: String,
-    tags: HashMap<String, String>,
-    fields: HashMap<String, String>,
-}
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client =
+        Client::new("http://homeassistant:8086", "homeassistant").with_auth("user", "pass");
 
-fn main() {
-    let nvml = Nvml::init().unwrap();
-    let device = nvml.device_by_index(0).unwrap();
+    let nvml = Nvml::init()?;
+    let device = nvml.device_by_index(0)?;
 
-    let mut tags = HashMap::new();
-    tags.insert("hostname".to_string(), gethostname().into_string().unwrap());
-
-    let fields = HashMap::new();
-
-    let mut point = Point {
-        measurement: "".to_string(),
-        tags,
-        fields,
-    };
+    let hostname = gethostname();
+    let mut interval = time::interval(Duration::from_secs(1));
 
     loop {
-        point.measurement = "pwr".to_string();
-        point.fields.insert(
-            "value".to_string(),
-            (device.power_usage().unwrap() / 1000).to_string(),
-        );
+        let now = SystemTime::now();
+        let etime = now.duration_since(UNIX_EPOCH)?.as_millis();
 
-        println!("{}", serde_json::to_string(&point).unwrap());
+        let points = vec![
+            Timestamp::Milliseconds(etime)
+                .into_query("pwr")
+                .add_field("value", device.power_usage()? / 1000)
+                .add_field("unit", "W")
+                .add_tag("hostname", hostname.to_str()),
+            Timestamp::Milliseconds(etime)
+                .into_query("gtemp")
+                .add_field("value", device.temperature(TemperatureSensor::Gpu)?)
+                .add_field("unit", "C")
+                .add_tag("hostname", hostname.to_str()),
+            Timestamp::Milliseconds(etime)
+                .into_query("mclk")
+                .add_field("value", device.clock_info(Clock::Memory)?)
+                .add_field("unit", "MHz")
+                .add_tag("hostname", hostname.to_str()),
+            Timestamp::Milliseconds(etime)
+                .into_query("pclk")
+                .add_field("value", device.clock_info(Clock::Graphics)?)
+                .add_field("unit", "MHz")
+                .add_tag("hostname", hostname.to_str()),
+            Timestamp::Milliseconds(etime)
+                .into_query("free")
+                .add_field("value", device.memory_info()?.free / (1024 * 1024))
+                .add_field("unit", "MHz")
+                .add_tag("hostname", hostname.to_str()),
+        ];
 
-        point.measurement = "gtemp".to_string();
-        point.fields.insert(
-            "value".to_string(),
-            device
-                .temperature(TemperatureSensor::Gpu)
-                .unwrap()
-                .to_string(),
-        );
+        client.query(points).await?;
 
-        println!("{}", serde_json::to_string(&point).unwrap());
-
-        point.measurement = "mclk".to_string();
-        point.fields.insert(
-            "value".to_string(),
-            device.clock_info(Clock::Memory).unwrap().to_string(),
-        );
-
-        println!("{}", serde_json::to_string(&point).unwrap());
-
-        point.measurement = "pclk".to_string();
-        point.fields.insert(
-            "value".to_string(),
-            device.clock_info(Clock::Graphics).unwrap().to_string(),
-        );
-
-        println!("{}", serde_json::to_string(&point).unwrap());
-
-        point.measurement = "free".to_string();
-        point.fields.insert(
-            "value".to_string(),
-            (device.memory_info().unwrap().used / (1024 * 1024)).to_string(),
-        );
-
-        println!("{}", serde_json::to_string(&point).unwrap());
-
-        thread::sleep(time::Duration::from_secs(1));
+        interval.tick().await;
     }
 }
