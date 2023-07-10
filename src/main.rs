@@ -35,34 +35,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let points = vec![
             Timestamp::Milliseconds(etime)
-                .into_query("pwr")
+                .into_query("gpu_pwr")
                 .add_field("value", device.power_usage()? / 1000)
                 .add_field("unit", "W")
                 .add_tag("hostname", hostname),
             Timestamp::Milliseconds(etime)
-                .into_query("gtemp")
+                .into_query("gpu_temp")
                 .add_field("value", device.temperature(TemperatureSensor::Gpu)?)
                 .add_field("unit", "C")
                 .add_tag("hostname", hostname),
             Timestamp::Milliseconds(etime)
-                .into_query("mclk")
+                .into_query("gpu_mclk")
                 .add_field("value", device.clock_info(Clock::Memory)?)
                 .add_field("unit", "MHz")
                 .add_tag("hostname", hostname),
             Timestamp::Milliseconds(etime)
-                .into_query("pclk")
+                .into_query("gpu_pclk")
                 .add_field("value", device.clock_info(Clock::Graphics)?)
                 .add_field("unit", "MHz")
                 .add_tag("hostname", hostname),
             Timestamp::Milliseconds(etime)
-                .into_query("free")
+                .into_query("gpu_mem_free")
                 .add_field("value", device.memory_info()?.free / (1024 * 1024))
-                .add_field("unit", "MHz")
+                .add_field("unit", "GB")
                 .add_tag("hostname", hostname),
             Timestamp::Milliseconds(etime)
-                .into_query("gpu_used")
+                .into_query("gpu_mem_used")
                 .add_field("value", device.memory_info()?.used / (1024 * 1024))
-                .add_field("unit", "MHz")
+                .add_field("unit", "GB")
                 .add_tag("hostname", hostname),
         ];
 
