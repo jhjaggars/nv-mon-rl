@@ -24,7 +24,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hn_os = gethostname();
     let hostname = hn_os.to_str().unwrap_or("localhost");
 
-    let mut interval = time::interval(Duration::from_secs(1));
+    let interval_length = env::var("NVMON_INTERVAL")
+        .unwrap_or("1".to_string())
+        .parse::<u64>()?;
+    let mut interval = time::interval(Duration::from_secs(interval_length));
 
     loop {
         let now = SystemTime::now();
@@ -54,6 +57,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Timestamp::Milliseconds(etime)
                 .into_query("free")
                 .add_field("value", device.memory_info()?.free / (1024 * 1024))
+                .add_field("unit", "MHz")
+                .add_tag("hostname", hostname),
+            Timestamp::Milliseconds(etime)
+                .into_query("gpu_used")
+                .add_field("value", device.memory_info()?.used / (1024 * 1024))
                 .add_field("unit", "MHz")
                 .add_tag("hostname", hostname),
         ];
