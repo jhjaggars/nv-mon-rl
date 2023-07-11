@@ -12,11 +12,16 @@ use nvml_wrapper::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let username = env::var("INFLUXDB_USERNAME").expect("set INFLUXDB_USERNAME");
-    let password = env::var("INFLUXDB_PASSWORD").expect("set INFLUXDB_PASSWORD");
+    let username = env::var("INFLUXDB_USERNAME");
+    let password = env::var("INFLUXDB_PASSWORD");
     let hostname = env::var("INFLUXDB_HOSTNAME").unwrap_or("http://homeassistant:8086".to_string());
     let database = env::var("INFLUXDB_DATABASE").unwrap_or("homeassistant".to_string());
-    let client = Client::new(hostname, database).with_auth(username, password);
+    let token = env::var("INFLUXDB_TOKEN");
+
+    let client = match token {
+        Ok(token) => Client::new(hostname, database).with_token(token),
+        _ => Client::new(hostname, database).with_auth(username.unwrap(), password.unwrap()),
+    };
 
     let nvml = Nvml::init()?;
     let device = nvml.device_by_index(0)?;
